@@ -1,4 +1,5 @@
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE CPP #-}
 module ProofCas.ExprView where
 
@@ -9,6 +10,7 @@ import GHCJS.DOM.Types (IsMouseEvent)
 import GHCJS.DOM.MouseEvent (getDataTransfer)
 import GHCJS.DOM.DataTransfer
 #endif
+import Data.Bool
 import Data.Monoid
 import Data.List
 import qualified Data.Text as T
@@ -37,16 +39,17 @@ exprSpan exprType selection contents pa = do
   rec
     (span, es) <- elDynAttr' "span" attrs contents
 
-    hovE <- hovering span Mouseleave Mouseover
     dragHovE <- hovering span Dragleave Dragenter
     dropE <- wrapDomEvent (_element_raw span) (onEventName Drop) (False <$ stopPropagation)
-    let selectedE = updated (demuxed selection pa)
+    let selected = demuxed selection pa
 
-    let dragHovE' = leftmost [dropE, dragHovE]
-    classes <- classesFor $
-      "expr-mouseover" =: hovE <>
-      "expr-dragenter" =: dragHovE' <>
-      "expr-selected" =: selectedE
+    hov <- holdDyn False =<< hovering span Mouseleave Mouseover
+    dragHov <- holdDyn False $ leftmost [dropE, dragHovE]
+    let classes = T.unwords <$> mconcat
+          [ bool [] ["expr-mouseover"] <$> hov
+          , bool [] ["expr-dragenter"] <$> dragHov
+          , bool [] ["expr-selected"] <$> selected
+          ]
 
     let plainAttrs = constDyn $ "draggable" =: "true"
         attrs      = setClasses classes plainAttrs
